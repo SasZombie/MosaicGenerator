@@ -27,13 +27,22 @@ std::tuple<int, int, int> getAverageColor(int factor, const unsigned char *image
     return std::make_tuple(averageR / pixelCount, averageG / pixelCount, averageB / pixelCount);
 }
 
-int main()
+int main(int argc, char const **argv)
 {
     constexpr int factor = 10;
-
     int width, height, channels;
+    std::string path;
 
-    unsigned char *image = stbi_load("pfp.jpg", &width, &height, &channels, 0);
+    if (argc == 1)
+    {
+        path = "pfp.jpg";
+    }
+    else
+    {
+        path = argv[1];
+    }
+
+    unsigned char *image = stbi_load(path.c_str(), &width, &height, &channels, 0);
 
     if (image == nullptr)
     {
@@ -42,7 +51,6 @@ int main()
     }
 
     unsigned char *newImage = new unsigned char[width * height * channels];
-
 
     for (int y = 0; y < height; y = y + factor)
     {
