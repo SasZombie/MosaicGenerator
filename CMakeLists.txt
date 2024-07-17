@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wformat-nonliteral -Wcast-align -Wpointer-arith -Wmissing-declarations -Winline -Wundef -Wcast-qual -Wshadow -Wwrite-strings -Wno-unused-parameter -Wfloat-equal -pedantic -ansi -fsanitize=address -fsanitize=leak")
 
-add_executable(main main.cpp stb_image.h stb_image_write.h)
+add_executable(main main.cpp stb_image.h stb_image_write.h stb_image_resize.h)
+add_executable(coloring coloring.cpp stb_image.h stb_image_write.h stb_image_resize.h)
 
 target_link_libraries(main)
