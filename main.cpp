@@ -2,6 +2,8 @@
 #include <tuple>
 #include <cstring>
 #include <unordered_map>
+#include "raylib/raylib-cpp/include/raylib-cpp.hpp"
+
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -128,11 +130,11 @@ void makeClassicMossaic(int height, int width, int factor, int channels, const u
     }
 }
 
-void makeImageMossaic(int height, int width, int factor, int channels, const unsigned char *image, unsigned char *newImage) noexcept
+void makeImageMossaic(int height, int width, int factor, int channels, const unsigned char *image, unsigned char *newImage, const std::string_view pathOfComponent) noexcept
 {
 
     int componentWidth, componentHeight, componentChanneles;
-    unsigned char *componentImage = stbi_load("images/White.png", &componentWidth, &componentHeight, &componentChanneles, 0);
+    unsigned char *componentImage = stbi_load(pathOfComponent.data(), &componentWidth, &componentHeight, &componentChanneles, 0);
 
     constexpr int newWidth = 30;
     constexpr int newHeight = 30;
@@ -147,9 +149,6 @@ void makeImageMossaic(int height, int width, int factor, int channels, const uns
         exit(-1);
     }
 
-    unsigned char* copyResized = new unsigned char[size];
-
-    std::memcpy(copyResized, resizedImage, size);
 
     for (int y = 0; y < height; y = y + factor)
     {
@@ -174,52 +173,131 @@ void makeImageMossaic(int height, int width, int factor, int channels, const uns
                 }
             }
 
-            std::memcpy(copyResized, resizedImage, size);
         }
     }
 
     stbi_image_free(componentImage);
     delete[] resizedImage;
-    delete[] copyResized;
 }
 
-int main(int argc, char const **argv)
+enum class typeOfMossaic{
+    classic, picture
+};
+
+int main()
 {
+    constexpr size_t WIDTH = 600, HEIGHT = 800;
+    constexpr size_t areaWidth = 100, areaHight = 25;
 
-    std::string path;
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+    raylib::Window window(WIDTH, HEIGHT, "Test");
+    raylib::Font font = LoadFont("fonts/Rubik/Rubik-VariableFont_wght.ttf");
 
-    if (argc == 1)
+    window.SetTargetFPS(60);
+
+    raylib::Texture2D texture;
+    float scale = 3.f;
+    bool textureLoaded = false;
+    bool exporting = false;
+
+    constexpr size_t xPad = 350, yPad = 60;
+    const raylib::Rectangle button{WIDTH / 2 - 150 / 2, HEIGHT - yPad, 150, 50};
+    std::string writting = "Next";
+    std::string text = "Drop an image to transform";
+    FilePathList paths;
+    std::string imagePaths[2];
+    size_t position = 0;
+
+    bool classic = false;
+
+    while (!window.ShouldClose())
     {
-        path = "images/anime.jpg";
+        window.BeginDrawing();
+        window.ClearBackground(BLACK);
+
+        if (IsFileDropped())
+        {
+            int fileCount;
+            paths = LoadDroppedFiles();
+
+            if (paths.count > 0)
+            {
+                if (textureLoaded)
+                {
+                    texture.Unload();
+                }
+
+                texture.Load(paths.paths[0]);
+                float scaleX = (float)WIDTH / texture.width;
+                float scaleY = (float)HEIGHT / texture.height;
+                scale = (scaleX < scaleY) ? scaleX : scaleY;
+                textureLoaded = true;
+                imagePaths[position] = paths.paths[0];
+
+                UnloadDroppedFiles(paths);
+            }
+        }
+
+        if (IsKeyPressed(KEY_E))
+        {
+            classic = !classic;
+        }
+
+        if (CheckCollisionPointRec(GetMousePosition(), button) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && textureLoaded)
+        {
+            writting = "Export";
+            textureLoaded = false;
+            texture.Unload();
+            text = "Drop an image to transform with";
+            ++position;
+
+            if(position == 2)
+            {
+                position = 0;
+                exporting = true;
+                writting = "Next";
+            }
+        }
+
+        if (exporting)
+        {
+            constexpr int factor = 30;
+            int width, height, channels;
+            unsigned char *image = stbi_load(imagePaths[0].c_str(), &width, &height, &channels, 0);
+
+            if (image == nullptr)
+            {
+                std::cerr << "Failed to load image\n";
+                return -1;
+            }
+
+            unsigned char *newImage = new unsigned char[width * height * channels];
+
+            if(classic)
+                makeClassicMossaic(height, width, factor, channels, image, newImage);
+            else
+                makeImageMossaic(height, width, factor, channels, image, newImage, imagePaths[1]);
+
+            if (!stbi_write_png("mosaic.png", width, height, channels, newImage, width * channels))
+            {
+                std::cerr << "Failed to save new image\n";
+                delete[] newImage;
+                stbi_image_free(image);
+                return -1;
+            }
+
+            delete[] newImage;
+            stbi_image_free(image);
+            exporting = false;
+        }
+        else if (textureLoaded)
+            texture.Draw(raylib::Vector2{(WIDTH - texture.width * scale) / 2, (HEIGHT - texture.height * scale) / 2}, 0.0f, scale);
+        else
+            raylib::DrawTextEx(font, text + static_cast<char>(classic), raylib::Vector2{WIDTH / 2 - 250, HEIGHT / 2}, 40, 0.5, WHITE);
+
+        button.Draw(RED);
+        raylib::DrawTextEx(font, writting, button.GetPosition(), 30, 0.f, WHITE);
+
+        window.EndDrawing();
     }
-    else
-    {
-        path = argv[1];
-    }
-
-    constexpr int factor = 30;
-    int width, height, channels;
-    unsigned char *image = stbi_load(path.c_str(), &width, &height, &channels, 0);
-
-    if (image == nullptr)
-    {
-        std::cerr << "Failed to load image\n";
-        return -1;
-    }
-
-    unsigned char *newImage = new unsigned char[width * height * channels];
-
-    // makeClassicMossaic(height, width, factor, channels, image, newImage);
-    makeImageMossaic(height, width, factor, channels, image, newImage);
-
-    if (!stbi_write_png("mosaic.png", width, height, channels, newImage, width * channels))
-    {
-        std::cerr << "Failed to save new image\n";
-        delete[] newImage;
-        stbi_image_free(image);
-        return -1;
-    }
-
-    delete[] newImage;
-    stbi_image_free(image);
 }
